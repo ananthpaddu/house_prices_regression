@@ -27,5 +27,5 @@ test<-full[(length(SalePrice)+1):nrow(full),]
 svm_model<-svm(SalePrice~., data=train, cost = 3)
 svm_pred <- predict(svm_model,newdata = test)
 
-solution <- data.frame(Id=Id,SalePrice=nthroot(other1$SalePrice*other2$SalePrice*svm_pred,3))
-write.csv(solution,"hybrid_solution.csv",row.names = F)
+solution <- data.frame(Id=Id,SalePrice=svm_pred)
+write.csv(solution,"/Users/karmapatel/Developer/Github/house_prices_advanced_regression_technique/sol1.csv",row.names = F)

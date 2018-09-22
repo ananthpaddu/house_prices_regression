@@ -1,0 +1,221 @@
+---
+title: "SVM benchmark"
+author: "Chengran (Owen) Ouyang"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    theme: readable
+    highlight: tango
+    code_folding : hide
+---
+
+
+
+<img src="https://i.imgur.com/MD1uw9D.jpg">
+
+
+# Goals & Objectives
+
+
+**Step 1**
+
+
+**The initial model is designed as a benchmark approach** - I'm trying to make it as easy to understand as possible by using basic code plus tidyverse for which you can stop at any step of the pipeline. Personally, I believe that it is necessary to have a decent benchmark approach. It tells you some of the preprocess is actually unnecessary and sometimes yields to a worse result.
+
+
+
+The goals and objectives of this kernal is to achieve decent score with mininum amount of knowledge and coding. This is a unconventional approach as it is always the key to fully understand the data and EDA is one of most important component of data science analysis. 
+
+
+
+The reason why I did not do any EDA or in-depth analysis is just to provide a benchmark score. Then, like everyone else, I would dive into the data and further alter the variables to improve accuracy but that would be in another kernal.
+
+
+
+By using this approach, it would get your score to be within the top 13% of this challenge. Given the fact that we do not know much about the data, the score is pretty decent.
+
+
+**Step 2** 
+To achieve outstanding outcome, I hybrid with other kaggler's result from [Top 2% from Laurenstc on house price prediction](https://www.kaggle.com/hemingwei/top-2-from-laurenstc-on-house-price-prediction) & 
+[All You Need is PCA (LB: 0.11421, top 4%)](https://www.kaggle.com/massquantity/all-you-need-is-pca-lb-0-11421-top-4) and achieve the ensemble result with even better score! 
+
+
+# Basic Set up
+
+
+
+## Load Packages
+
+```{r setup, include=T, message = F, warning=F}
+
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(tidyverse, mice, e1071, Metrics, skimr, pracma)
+
+```
+
+
+
+## Load Datasets
+
+
+
+
+
+```{r, message = F, warning=F}
+
+dir("../input/")
+
+train <- read.csv("../input/house-prices-advanced-regression-techniques/train.csv", stringsAsFactors = F)
+test <- read.csv("../input/house-prices-advanced-regression-techniques/test.csv", stringsAsFactors = F)
+full <- bind_rows(train,test)
+
+other1 <- read.csv("../input/top-2-from-laurenstc-on-house-price-prediction/final_submission.csv")
+other2 <- read.csv("../input/all-you-need-is-pca-lb-0-11421-top-4/submission.csv")
+```
+
+
+
+# Brief Overview of the Data
+
+
+
+Just a very brief overview of the data, we know the datatypes and many NA's in this datasets. The strategy is very simple. We are going to fill the NA in Character column with 'Not Available' (Can be changed to literally anything).
+
+
+
+```{r, message = F, warning=F}
+
+full %>% skim()
+
+# sapply(full,function(x) sum(is.na(x))) # Check how many NA per column
+
+```
+
+
+
+# Preprocess Data
+
+## Separate Id and SalePrice
+
+I only saved the Id for the test dataset so that I can use it to submit the result on kaggle. The SalePrice is the independent variable for which I need to use to train the model; however, if I don't take it aside, it would be filled up when I applied the mice function.
+
+
+
+```{r, message = F, warning=F}
+
+SalePrice <- train$SalePrice
+
+Id <- test$Id
+
+
+
+full[,c('Id','SalePrice')] <- NULL
+
+rm(train,test)
+
+```
+
+
+
+## Separate the dataset into charactor variables and integer variables
+
+Use different strategies to fill NA for Charactor variables and Integer variables. Therefore, I separate the dataset into two groups.
+
+
+
+```{r, message = F, warning=F}
+
+chr <- full[,sapply(full,is.character)]
+
+int <- full[,sapply(full,is.integer)]
+
+```
+
+
+
+## Fill Character variable's NA with "Not available" and turn it into factor
+
+
+
+```{r, message = F, warning=F}
+
+chr[is.na(chr)] <- "Not Available"
+fac <- chr %>% lapply(as.factor) %>% as.data.frame()
+
+```
+
+
+
+## Use Mice package to fill the NA for Numeric Variable using Random Forest
+
+Mice package is very handy in filling NAs. The result is not the best but it is better than using median of the each variable to fill the gap. What's more, it is nice and easy to use.
+
+```{r, message = F, warning=F, results = "hide"}
+
+full <- bind_cols(fac,int)
+
+micemod <- full %>% mice(method='rf')
+full <- complete(micemod)
+
+
+rm(chr,fac,int,fill_chr,micemod)
+
+```
+
+
+
+# Modelling
+
+## Separate Train and Test Data
+
+Split Train and Test set.
+
+```{r, message = F, warning=F}
+
+train <- full[1:length(SalePrice),]
+
+test<-full[(length(SalePrice)+1):nrow(full),]
+
+```
+
+
+
+## Proceed with Support Vector Machine
+
+I did a little bit work behind the scene by testing it via all kinds of models. Surprisingly, svm gives the best result comparing to other models. 
+Then, I tested the tuning parameter cost and find 3 gives the best outcome. 
+
+```{r, message = F, warning=F}
+
+svm_model<-svm(SalePrice~., data=train, cost = 3)
+
+svm_pred <- predict(svm_model,newdata = test)
+
+```
+
+
+## Hybrid
+
+In the end, I mixed with the result from [Top 2% from Laurenstc on house price prediction](https://www.kaggle.com/hemingwei/top-2-from-laurenstc-on-house-price-prediction) & 
+[All You Need is PCA (LB: 0.11421, top 4%)](https://www.kaggle.com/massquantity/all-you-need-is-pca-lb-0-11421-top-4).
+
+```{r, message = F, warning=F}
+
+solution <- data.frame(Id=Id,SalePrice=nthroot(other1$SalePrice*other2$SalePrice*svm_pred,3))
+
+write.csv(solution,"hybrid_solution.csv",row.names = F)
+
+```
+# Conclusion
+
+The initial model should serves well as the Benchmark approach and it provides decent score without even dive into the dataset, while the hybrid model provide outstanding outcome. We successfully achieved top 2% on LB.
+If you like this baseline model and/or it helps you to develope yours, please give a upvote and feel free to fork!
+
+
+
+
+
+
