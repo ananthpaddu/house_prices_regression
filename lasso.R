@@ -1,5 +1,5 @@
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(tidyverse, mice, e1071, Metrics, skimr, pracma)
+pacman::p_load(tidyverse, mice, e1071, Metrics, skimr, pracma, knitr, ggplot2, plyr, dplyr, corrplot, caret, gridExtra, scales, Rmisc, ggrepel, randomForest, psych, xgboost)
 
 train <- read.csv("https://www.dropbox.com/s/pniwqrjk5nmhupp/train.csv?dl=1", stringsAsFactors = F)
 test <- read.csv("https://www.dropbox.com/s/bxj4sgves9f5g4y/test.csv?dl=1", stringsAsFactors = F)
@@ -24,8 +24,11 @@ rm(chr,fac,int,fill_chr,micemod)
 train <- full[1:length(SalePrice),]
 test<-full[(length(SalePrice)+1):nrow(full),]
 
-svm_model<-svm(SalePrice~., data=train, cost = 3)
-svm_pred <- predict(svm_model,newdata = test)
+set.seed(841995)
+my_control <-trainControl(method="cv", number=5)
+lassoGrid <- expand.grid(alpha = 1, lambda = seq(0.001,0.1,by = 0.0005))
+lasso_mod <- train(x=train, y=SalePrice, method='glmnet', trControl= my_control, tuneGrid=lassoGrid) 
 
-solution <- data.frame(Id=Id,SalePrice=svm_pred)
-write.csv(solution,"/Users/karmapatel/Developer/Github/house_prices_advanced_regression_technique/svm.csv",row.names = F)
+
+solution <- data.frame(Id=Id,SalePrice=lasso_pred)
+write.csv(solution,"/Users/karmapatel/Developer/Github/house_prices_advanced_regression_technique/lasso.csv",row.names = F)
